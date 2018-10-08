@@ -2,7 +2,12 @@ package ru.airiva;
 
 import com.google.common.collect.ImmutableMap;
 
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -41,21 +46,53 @@ public class Ean128Generator {
     private static final int START_NUMBER = 103;
     private static final int STOP_NUMBER = 106;
 
-    public String generateCode(char[] eanContent) {
+    public static BufferedImage generateEan128Image(String ean128Code, int width, int height, int safeWidth) {
+
+        boolean[] ean128BinaryCode = generateBinaryCode(ean128Code.toCharArray());
+        int lineWidth = calcLineWidth(ean128BinaryCode.length, width, safeWidth);
+        int indent = calcIndent(ean128BinaryCode.length, lineWidth, width);
+
+        BufferedImage bufferedImage = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_BINARY);
+        Graphics2D image = bufferedImage.createGraphics();
+
+        image.setColor(Color.WHITE);
+        image.fillRect(0, 0, width, height);
+
+
+        int x = indent;
+        for (boolean code : ean128BinaryCode) {
+            image.setColor(code ? Color.BLACK : Color.WHITE);
+            image.fillRect(x, 0, lineWidth, height);
+            x += lineWidth;
+        }
+        try {
+            ImageIO.write(bufferedImage, "png", new File("/home/ivan/img/img.png"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return bufferedImage;
+
+    }
+
+    private static int calcLineWidth(int lineCount, int width, int safeWidth) {
+        return (width - 2 * safeWidth) / lineCount;
+    }
+
+    private static int calcIndent(int lineCount, int lineWidth, int width) {
+        return (width - lineCount * lineWidth) / 2;
+    }
+
+    private static boolean[] generateBinaryCode(char[] eanContent) {
         StringBuilder builder = new StringBuilder(CODE128_TABLE[START_NUMBER]);
         for (char symbol : eanContent) {
             builder.append(CODE128_TABLE[SYMBOLS.get(symbol)]);
         }
         builder.append(CODE128_TABLE[calculateCheckSymbol(eanContent)]);
         builder.append(CODE128_TABLE[STOP_NUMBER]);
-        return builder.toString();
+        return toBinary(builder.toString());
     }
 
-    public BufferedImage generateImage(String ean128Code, int width, int height, int resolution) {
-
-    }
-
-    private int calculateCheckSymbol(char[] eanContent) {
+    private static int calculateCheckSymbol(char[] eanContent) {
         int result = 0;
         int i = 1;
         for (char symbol : eanContent) {
@@ -63,6 +100,31 @@ public class Ean128Generator {
             i++;
         }
         return result % START_NUMBER;
+    }
+
+    private static boolean[] toBinary(String eanCode) {
+        int[] eanCodeArray = new int[eanCode.length()];
+        for (int i = 0; i < eanCode.length(); i++) {
+            eanCodeArray[i] = Integer.parseInt(String.valueOf(eanCode.charAt(i)));
+        }
+        int sum = 0;
+        for (int n : eanCodeArray) {
+            sum += n;
+        }
+        boolean[] binary = new boolean[sum];
+        int count = 0;
+        for (int i = 0; i < eanCodeArray.length; i++) {
+            boolean isLine = i % 2 == 0;
+            for (int j = 0; j < eanCodeArray[i]; j++) {
+                binary[count] = isLine;
+                count++;
+            }
+        }
+        return binary;
+    }
+
+    public static void main(String[] args) {
+        generateEan128Image("%1234567890123", 200, 50, 0);
     }
 
 
